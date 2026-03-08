@@ -1,56 +1,118 @@
-flowchart TD
-    %% ---------------------------------------------------------------
-    %% 1️⃣ Front‑end / API layer
-    %% ---------------------------------------------------------------
-    subgraph API["FastAPI API"]
-        direction TB
-        A1[User / Client] --> A2[FastAPI]
-    end
-    A2 --> B[Redis Queue]
+## System Architecture
 
-    %% ---------------------------------------------------------------
-    %% 2️⃣ Background worker
-    %% ---------------------------------------------------------------
-    B --> C[Celery Worker]
+The AI Debugging System follows a **distributed multi-agent architecture** designed for scalability and production-level debugging workflows.
 
-    %% ---------------------------------------------------------------
-    %% 3️⃣ LangGraph debugging workflow (core of the system)
-    %% ---------------------------------------------------------------
-    C --> D[LangGraph Debugging Workflow]
+```
+                     User
+                       |
+                       v
+                 FastAPI API
+                       |
+                       v
+                  Redis Queue
+                       |
+                       v
+                 Celery Worker
+                       |
+                       v
+             LangGraph Debugging Workflow
+                       |
+   -----------------------------------------------------------
+   |            |              |            |                |
+   v            v              v            v                v
+Log Analyzer  Code Retrieval  Root Cause   Fix Generator   Patch Validator
+   Agent          Agent          Agent          Agent            Agent
+                  (RAG)
+                       |
+                       v
+                    ChromaDB
+                (Vector Database)
+                       |
+                       v
+                 Source Repository
+                       |
+                       v
+              Langfuse Observability
+```
 
-    subgraph LGW["LangGraph Debugging Workflow"]
-        direction LR
-        LG1[Log Analyzer]      --> LG2[Code Retrieval]
-        LG2 --> LG3[Graph Analyzer]
-        LG3 --> LG4[Root Cause Analyzer]
-        LG4 --> LG5[Fix Generator]
-        LG5 --> LG6[Patch Validator]
-    end
-    D --> LGW
+### Architecture Explanation
 
-    %% ---------------------------------------------------------------
-    %% 4️⃣ Persistence & observability
-    %% ---------------------------------------------------------------
-    LGW --> E[ChromaDB]
+The system is built using a **multi-agent pipeline** where each agent performs a specialized debugging task.
 
+#### 1. User Request
 
-In plain English…
-API receives a request (a repo URL + optional config).
+A developer submits an error log through the API to initiate the debugging process.
 
-The request is pushed onto Redis – the web layer stays fast and responsive.
+#### 2. FastAPI API Layer
 
-Celery picks it up and hands it to the LangGraph workflow.
+The API receives the request and sends a debugging job to the background task queue.
 
-Inside LangGraph the following sub‑steps happen, left‑to‑right:
+#### 3. Redis Queue
 
-Log Analyzer – pulls the latest logs and extracts clues.
-Code Retrieval – fetches the relevant file(s) from the repo.
-Graph Analyzer – builds a semantic graph of functions/imports.
-Root‑Cause Analyzer – pinpoints the exact line/condition that broke things.
-Fix Generator – asks the LLM (or a rule‑based engine) for a patch.
-Patch Validator – runs the test suite, ensures the fix doesn’t regress.
-The resulting patch (and any diagnostics) are stored in ChromaDB and the Repository folder.
+Redis acts as the **message broker** that queues debugging tasks before they are processed by workers.
 
-Every step is logged to Langfuse, so you can replay a run, compare prompts, or debug the debugger itself.
-    E --> F[Repository]
-    F --> G[Langfuse Observability]
+#### 4. Celery Worker
+
+Celery workers process debugging jobs asynchronously.
+This prevents long-running AI tasks from blocking API responses.
+
+#### 5. LangGraph Workflow
+
+LangGraph orchestrates the debugging pipeline and coordinates the following agents:
+
+* Log Analyzer Agent
+* Code Retrieval Agent
+* Root Cause Agent
+* Fix Generator Agent
+* Patch Validator Agent
+
+Each agent receives the state from the previous step and updates the debugging context.
+
+#### 6. Retrieval-Augmented Code Search (RAG)
+
+The Code Retrieval Agent performs semantic search using **ChromaDB** to fetch relevant code snippets from the repository.
+
+Embeddings are generated using **Sentence Transformers**.
+
+#### 7. Fix Generation
+
+The Fix Generator Agent uses an LLM (running locally through **Ollama / LLaMA3**) to generate a patch for the detected bug.
+
+Example generated fix:
+
+```
+- user = request.data['user_id']
++ user = request.data.get('user_id')
+```
+
+#### 8. Patch Validation
+
+The Patch Validator Agent applies the generated patch and runs validation checks or tests.
+
+If validation fails, the workflow retries fix generation automatically.
+
+#### 9. Observability
+
+The system integrates **Langfuse** for AI observability.
+Langfuse tracks:
+
+* LLM prompts
+* LLM responses
+* agent execution traces
+* latency metrics
+* debugging pipeline runs
+
+This helps monitor model behavior and debug the AI system itself.
+
+### Why This Architecture is Production Ready
+
+This architecture demonstrates several real-world AI infrastructure patterns:
+
+* Multi-Agent AI systems
+* Retrieval-Augmented Generation (RAG)
+* Distributed background processing with Celery
+* Message brokering using Redis
+* LLM observability with Langfuse
+* Containerized deployment using Docker
+
+Together, these components create a scalable AI system capable of automatically debugging software errors.
