@@ -1,19 +1,20 @@
 FROM python:3.11-slim
 
-# Set working directory
+# working directory
 WORKDIR /app
 
-# Copy requirements
+# copy requirements
 COPY requirements.txt .
 
-# Install dependencies
+# install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
+# copy project files
 COPY . .
 
-# Environment variables
-ENV PYTHONUNBUFFERED=1
+# important for python imports
 ENV PYTHONPATH=/app
-# Run the pipeline
-CMD ["python", "tests/test_full_pipeline.py"]
+ENV PYTHONUNBUFFERED=1
+
+# start fastapi server
+CMD ["uvicorn", "api.debug_api:app", "--host", "0.0.0.0", "--port", "8000"]

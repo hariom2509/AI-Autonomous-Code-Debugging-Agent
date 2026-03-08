@@ -2,9 +2,9 @@ from celery import Celery
 
 celery_app = Celery(
     "ai_debug_agent",
-    broker="redis://localhost:6379/0",
-    backend="redis://localhost:6379/0"
-)
+    broker="redis://host.docker.internal:6379/0",
+    backend="redis://host.docker.internal:6379/0"
+    )
 
 celery_app.conf.update(
     task_serializer="json",
